@@ -33,17 +33,17 @@ or store a signature to a file for reuse later. ",
                     .short("s")
                     .long("save")
                     .takes_value(true)
-                    .help("Save keypair to file"),
+                    .help("Save keypair to file")
             )
             .arg(Arg::with_name("public")
                  .short("p")
                  .long("public")
                  .help("Display public key"))
             .arg(
-                Arg::with_name("Sign")
+                Arg::with_name("sign")
                     .short("S")
                     .long("Sign")
-                    .help("Sign the files"),
+                    .help("Sign the files")
             )
             .arg(Arg::with_name("files")
                  .multiple(true)
