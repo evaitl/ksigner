@@ -1,3 +1,6 @@
+use std::io::{Read,Write};
+use std::fs::OpenOptions;
+
 #[derive(Debug)]
 struct KSignerArgs {
     load: String, // fname to load a keypair from
@@ -52,7 +55,6 @@ or store a signature to a file for reuse later. ",
 }
 use ed25519_dalek::Keypair;
 use std::fs::File;
-use std::io::prelude::*;
 fn get_keypair(s: &str) -> Keypair {
     if s=="" {
         use rand::rngs::OsRng;
@@ -64,8 +66,38 @@ fn get_keypair(s: &str) -> Keypair {
         serde_json::from_reader(r).expect("Read or parse error")
     }
 }
+
+
 fn process_files(sign: bool, kp: &Keypair, fns: &Vec<String>) {
-    
+    use ed25519_dalek::{SIGNATURE_LENGTH, Signature, Signer};
+    for fname in fns {
+        if sign {
+            println!("Signing  {}",fname);
+            let mut r=File::open(fname).expect(&format!("Couldn't open file {}",fname));
+            let mut buf=Vec::new();
+            r.read_to_end(&mut buf).expect(&format!("Read error on {}",fname));
+            drop(r);
+            let sig=kp.sign(&buf);
+            let mut w=OpenOptions::new().append(true).open(fname)
+                .expect(&format!("Couln't append {}",fname));
+            w.write_all(&sig.to_bytes()).expect("Write failure");
+        } else {
+            println!("Checking: {}",fname);
+            let mut r=File::open(fname).expect("Couldn't open file");
+            let len=r.metadata().unwrap().len() as usize-SIGNATURE_LENGTH;
+            let mut buf=vec![0u8;len];
+            r.read_exact(&mut buf).expect("Read error");
+            let mut sigbuf= [0u8; SIGNATURE_LENGTH];
+            r.read_exact(&mut sigbuf).expect("Read sig error");
+            let sig=Signature::from(sigbuf);
+            let res=kp.verify(&buf,&sig);
+            if res.is_err() {
+                println!("Signature failed on {}: {:?}",fname,res);
+            } else{
+                println!("Signature valid for {}",fname);
+            }
+        }
+    }
 }
 fn save_keypair(sf: &str, kp: &Keypair){
     if sf=="" {
