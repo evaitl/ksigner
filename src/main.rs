@@ -5,13 +5,14 @@ use std::fs::OpenOptions;
 struct KSignerArgs {
     load: String, // fname to load a keypair from
     save: String, // fname to write keypair to
+    public: bool, // Display public key
     sign: bool, // Sign the files
     files: Vec<String>,
 }
 impl KSignerArgs {
     fn new() -> Self {
         use clap::{App, Arg};
-        let app = App::new("ksigner")
+        let matches = App::new("ksigner")
             .version("0.1")
             .about("Signs files by tacking a signature onto the end")
             .long_about(
@@ -34,24 +35,34 @@ or store a signature to a file for reuse later. ",
                     .takes_value(true)
                     .help("Save keypair to file"),
             )
+            .arg(Arg::with_name("public")
+                 .short("p")
+                 .long("public")
+                 .help("Display public key"))
             .arg(
                 Arg::with_name("Sign")
                     .short("S")
                     .long("Sign")
-                    .takes_value(true)
                     .help("Sign the files"),
             )
             .arg(Arg::with_name("files")
                  .multiple(true)
                  .help("Files to operate on"))
             .get_matches();
+        
         KSignerArgs {
-            load: String::new(),
-            save: String::new(),
-            sign: false,
-            files: Vec::new(),
+            load: matches.value_of("load").unwrap_or("").to_string(),
+            save: matches.value_of("save").unwrap_or("").to_string(),
+            public: matches.is_present("public"),
+            sign: matches.is_present("sign"),
+            files:
+            match matches.values_of("files") {
+                Some(iter) => iter.map(|s|s.to_string()).collect(),
+                _ => vec![],
+            }
         }
     }
+    
 }
 use ed25519_dalek::Keypair;
 use std::fs::File;
@@ -61,7 +72,6 @@ fn get_keypair(s: &str) -> Keypair {
         let mut csprng=OsRng{};
         Keypair::generate(&mut csprng)
     } else {
-        
         let r=File::open(s).expect("Couldn't open key file");
         serde_json::from_reader(r).expect("Read or parse error")
     }
@@ -108,9 +118,11 @@ fn save_keypair(sf: &str, kp: &Keypair){
 }
 fn main() {
     let args = KSignerArgs::new();
-    println!("Hello, world!");
     println!("args: {:?}", args);
-    let keypair= get_keypair(&args.load);
-    process_files(args.sign,&keypair,&args.files);
-    save_keypair(&args.save, &keypair);
+    let kp= get_keypair(&args.load);
+    if args.public {
+        println!("Public key: {}",serde_json::to_string(&kp.public).unwrap());
+    }
+    process_files(args.sign,&kp,&args.files);
+    save_keypair(&args.save, &kp);
 }
